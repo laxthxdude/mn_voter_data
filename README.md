@@ -1,2 +1,17 @@
-# mn_voter_data
-Working with data from OSS for MN Voter Data
+# Minnesota Voter Data
+
+Working with data from OSS for MN Voter Data.
+
+Prerequisites 
+1. System capable of running python3
+2. System with python3 additional dependencies installed (sqlite3, csv, chardet, os, sys, datatime, argparse, tabulate)
+3. System with available storage (Around 5-6GB in tota: ~350MB for OSS archive, will expand to several GB flat files, creation of sqlite3 database will require ~3.5GB)
+
+Basic Steps: 
+1. Uncompress the recieved file from OSS. The file should be the FULL dataset (all available fields).
+2. The resulting Voter01.txt...Voter08.txt files and Election01.txt...Election08.txt are expanded along with a readme.txt file.
+3. Execute the _import_to_sqlite3.py_ in the same working directory as the Voter01...Election01... files to parse the raw data into a sqlite3 database.
+4. Execute the _voter_election_report.py_ to query for records in the resulting database.
+   *** `bash
+   python3 voter_election_report.py --first-name "Linda" --last-name "Johnson" --zip-code "55947" --db-name "custom.db"
+   ***
