@@ -54,15 +54,35 @@ def create_database(db_name="voters.db"):
         )
     ''')
 
-    # List of voter files
+    # Create election_history table with the provided structure
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS election_history (
+            VoterId INTEGER,
+            ElectionDate TEXT,
+            ElectionDescription TEXT,
+            VotingMethod TEXT,
+            FOREIGN KEY (VoterId) REFERENCES voters(VoterId)
+        )
+    ''')
+
+    # Add indexes for frequently queried fields
+    cursor.execute('CREATE INDEX idx_firstname ON voters(FirstName);')
+    cursor.execute('CREATE INDEX idx_lastname ON voters(LastName);')
+    cursor.execute('CREATE INDEX idx_zipcode ON voters(ZipCode);')
+
+    # List of voter and election files
     voter_files = [f"Voter{i:02d}.txt" for i in range(1, 9)]  # Generates Voter01.txt to Voter08.txt
+    election_files = [f"Election{i:02d}.txt" for i in range(1, 9)]  # Generates Election01.txt to Election08.txt
     current_dir = os.getcwd()
 
-    total_rows = 0
-    imported_rows = 0
+    total_voter_rows = 0
+    imported_voter_rows = 0
+    total_election_rows = 0
+    imported_election_rows = 0
     error_log = []
 
-    # Process each voter file
+    # Process voter files
+    print("Processing voter files...")
     for file_name in voter_files:
         file_path = os.path.join(current_dir, file_name)
         if not os.path.exists(file_path):
@@ -82,7 +102,7 @@ def create_database(db_name="voters.db"):
             reader = csv.reader(csvfile, quotechar='"', skipinitialspace=True)
             next(reader, None)  # Skip header
             file_rows = sum(1 for _ in reader)
-            total_rows += file_rows
+            total_voter_rows += file_rows
             print(f"Processing {file_name} with {file_rows} rows.")
 
         # Process CSV file with error handling
@@ -159,7 +179,69 @@ def create_database(db_name="voters.db"):
                             :LegacyId, :PermanentAbsentee)
                     ''', voter_data)
                     file_imported_rows += 1
-                    imported_rows += 1
+                    imported_voter_rows += 1
+
+                except ValueError as ve:
+                    error_log.append(f"Row {file_imported_rows + 2} in {file_name}: ValueError - {str(ve)}. Skipping row.")
+                except Exception as e:
+                    error_log.append(f"Row {file_imported_rows + 2} in {file_name}: Unexpected error - {str(e)}. Skipping row.")
+
+        print(f"Imported {file_imported_rows} rows from {file_name}.")
+
+    # Process election files
+    print("Processing election history files...")
+    for file_name in election_files:
+        file_path = os.path.join(current_dir, file_name)
+        if not os.path.exists(file_path):
+            print(f"Warning: File {file_path} does not exist. Skipping.")
+            continue
+
+        # Detect encoding
+        with open(file_path, 'rb') as raw_file:
+            raw_data = raw_file.read(10000)  # Read first 10KB to detect encoding
+            result = chardet.detect(raw_data)
+            encoding = result['encoding'] or 'utf-8'
+            if result['confidence'] < 0.8:
+                print(f"Warning: Low confidence ({result['confidence']}) in detected encoding {encoding} for {file_name}.")
+
+        # Count total rows (excluding header)
+        with open(file_path, 'r', encoding=encoding) as csvfile:
+            reader = csv.reader(csvfile, quotechar='"', skipinitialspace=True)
+            next(reader, None)  # Skip header
+            file_rows = sum(1 for _ in reader)
+            total_election_rows += file_rows
+            print(f"Processing {file_name} with {file_rows} rows.")
+
+        # Process CSV file with error handling
+        with open(file_path, 'r', encoding=encoding) as csvfile:
+            reader = csv.reader(csvfile, quotechar='"', skipinitialspace=True)
+            header = next(reader, None)  # Skip header
+            if not header or len(header) != 4:  # Expecting 4 fields: VoterId, ElectionDate, ElectionDescription, VotingMethod
+                print(f"Error: Invalid header in {file_path}. Expected 4 fields. Skipping file.")
+                continue
+
+            file_imported_rows = 0
+            for row in reader:
+                if len(row) != 4:
+                    error_log.append(f"Row {file_imported_rows + 2} in {file_name}: Incorrect number of fields ({len(row)} instead of 4). Skipping.")
+                    continue
+
+                try:
+                    # Map row data to table fields with error handling
+                    election_data = {
+                        "VoterId": int(row[0]) if row[0] else None,
+                        "ElectionDate": parse_date(row[1]) if row[1] else None,
+                        "ElectionDescription": row[2] if row[2] else None,
+                        "VotingMethod": row[3] if row[3] else None
+                    }
+
+                    # Insert data into the table
+                    cursor.execute('''
+                        INSERT INTO election_history (VoterId, ElectionDate, ElectionDescription, VotingMethod)
+                        VALUES (:VoterId, :ElectionDate, :ElectionDescription, :VotingMethod)
+                    ''', election_data)
+                    file_imported_rows += 1
+                    imported_election_rows += 1
 
                 except ValueError as ve:
                     error_log.append(f"Row {file_imported_rows + 2} in {file_name}: ValueError - {str(ve)}. Skipping row.")
@@ -172,10 +254,14 @@ def create_database(db_name="voters.db"):
     conn.commit()
 
     # Print overall summary with total rows comparison
-    print(f"Total rows across all files (excluding headers): {total_rows}")
-    print(f"Total imported rows into {db_name}: {imported_rows}")
-    if imported_rows != total_rows:
-        print(f"Warning: Imported rows ({imported_rows}) do not match total rows in files ({total_rows}).")
+    print(f"Total voter rows across all files (excluding headers): {total_voter_rows}")
+    print(f"Total imported voter rows into {db_name}: {imported_voter_rows}")
+    if imported_voter_rows != total_voter_rows:
+        print(f"Warning: Imported voter rows ({imported_voter_rows}) do not match total voter rows in files ({total_voter_rows}).")
+    print(f"Total election rows across all files (excluding headers): {total_election_rows}")
+    print(f"Total imported election rows into {db_name}: {imported_election_rows}")
+    if imported_election_rows != total_election_rows:
+        print(f"Warning: Imported election rows ({imported_election_rows}) do not match total election rows in files ({total_election_rows}).")
     if error_log:
         print(f"Encountered {len(error_log)} errors across all files:")
         for error in error_log[:10]:  # Show first 10 errors, adjust as needed
@@ -190,9 +276,12 @@ def parse_date(date_str):
     """Parse date string with flexible formats."""
     if not date_str:
         return None
-    for fmt in ('%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S'):
+    # Add MM/DD/YYYY format first for election dates
+    for fmt in ('%m/%d/%Y', '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S'):
         try:
-            return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d %H:%M:%S')  # Normalize to standard format
+            # Debug: Uncomment to troubleshoot
+            # print(f"Attempting to parse: {date_str} with {fmt}")
+            return datetime.strptime(date_str, fmt).strftime('%Y-%m-%d')  # Normalize to YYYY-MM-DD
         except ValueError:
             continue
     return None  # Return None if unparseable
