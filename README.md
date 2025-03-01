@@ -13,4 +13,5 @@ Basic Steps:
 3. Execute the `import_to_sqlite3.py` in the same working directory as the `Voter01.txt`...`Election01.txt` files to parse the raw data into a sqlite3 database. It expects the standard eight files for each as supplied from the OSS.
 4. Execute the `voter_election_report.py` to query for records in the resulting database.
    ``` bash
-   python3 voter_election_report.py --first-name "Cory" --last-name "Johnson" --zip-code "55947" --db-name "voters.db" ```
+   python3 voter_election_report.py --first-name "Cory" --last-name "Johnson" --zip-code "55947" --db-name "voters.db"
+   ```
