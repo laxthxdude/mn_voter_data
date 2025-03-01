@@ -10,7 +10,7 @@ Prerequisites
 Basic Steps: 
 1. Uncompress the received file from OSS. The file should be the FULL dataset (all available fields). Example: `WO250202.zip` for the February 2, 2025 exported data set.
 2. The resulting `Voter01.txt`...`Voter08.txt` files and `Election01.txt`...`Election08.txt` are expanded along with a `readme.txt` file.
-3. Execute the `import_to_sqlite3.py` in the same working directory as the `Voter01.txt`...`Election01.txt` files to parse the raw data files into a sqlite3 database. It expects the standard eight files for each (Voters, Election History) as supplied from the OSS. Import speed depends on your system, verbose logging will display as things run. The OSS inserts some dummy duplicate records (David D. Director) into each Voter0x.txt file so 7 errors showing up from Voter02.txt...Voter03.txt is expected as those will be skipped (duplicates).
+3. Execute the `import_to_sqlite3.py` in the same working directory as the `Voter01.txt`...`Election01.txt` files to parse the raw data files into a sqlite3 database. It expects the standard eight files for each (Voters, Election History) as supplied from the OSS. Import speed depends on your system, verbose logging will display as things run. The OSS inserts some dummy duplicate records (David D. Director) into each Voter0x.txt file so 7 errors showing up from Voter02.txt...Voter08.txt is expected as those will be skipped (duplicates). Those will show as _Unexpected error - UNIQUE constraint failed: voters.VoterId. Skipping row._ This is expected. 
    ``` bash
    python3 import_to_sqlite3.py
    ```
