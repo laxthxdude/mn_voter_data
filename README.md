@@ -10,7 +10,7 @@ Prerequisites
 Basic Steps: 
 1. Uncompress the recieved file from OSS. The file should be the FULL dataset (all available fields).
 2. The resulting `Voter01.txt`...`Voter08.txt` files and `Election01.txt`...`Election08.txt` are expanded along with a `readme.txt` file.
-3. Execute the `import_to_sqlite3.py` in the same working directory as the `Voter01.txt`...`Election01.txt` files to parse the raw data into a sqlite3 database. It expects the standard eight files for each as supplied from the OSS.
+3. Execute the `import_to_sqlite3.py` in the same working directory as the `Voter01.txt`...`Election01.txt` files to parse the raw data into a sqlite3 database. It expects the standard eight files for each as supplied from the OSS. Import speed depends on your system, verbose logging will display as things run.
 4. Execute the `voter_election_report.py` to query for records in the resulting database.
    ``` bash
    python3 voter_election_report.py --first-name "Cory" --last-name "Johnson" --zip-code "55947" --db-name "voters.db"
