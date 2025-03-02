@@ -15,8 +15,8 @@ Basic Steps:
    python3 import_to_sqlite3.py
    ```
    You should now have a newly created `voters.db` sqlite3 database in the same directory. 
-4. Execute the `voter_election_report.py` to query for records in the resulting database.
+4. Execute the `voter_election_report_printf.py` to query for records in the resulting database.
    ``` bash
-   python3 voter_election_report.py --first-name "Cory" --last-name "Johnson" --zip-code "55947" --db-name "voters.db"
+   python3 voter_election_report_printf.py --first-name "Cory" --last-name "Johnson" --zip-code "55947" --db-name "voters.db"
    ```
 5. Happy querying :-) 
