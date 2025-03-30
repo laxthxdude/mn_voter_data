@@ -1,3 +1,7 @@
+# Provides an ability to query a Voter via First name, Last name, Zipcode directly via command line and see their voting history.
+# Use: voter_election_report voters.db, first_name, last_name, zip_code
+# Assumes the voters.db was generated using import_to_sqlite3.py
+
 import sqlite3
 import sys
 from datetime import datetime
