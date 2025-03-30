@@ -14,7 +14,7 @@ This Python script creates a SQLite database (`voters.db`) and imports voter reg
 - Prints a summary of total rows vs. imported rows, with warnings for discrepancies.
 
 ## Prerequisites
-- A computer with internet access.
+- A computer with internet access and at least 4GB of free space.
 - Python 3 installed (see installation steps below if you don’t have it).
 - Required Python libraries: `sqlite3` (built-in), `csv` (built-in), `chardet`, `os` (built-in), `sys` (built-in), `datetime` (built-in).
 
@@ -132,6 +132,7 @@ The script requires the `chardet` library for encoding detection. Install it usi
 - **Date Parsing**: Supports formats like `MM/DD/YYYY`, `YYYY-MM-DD HH:MM:SS`, and normalizes to `YYYY-MM-DD`.
 - **Performance**: Indexes on `FirstName`, `LastName`, and `ZipCode` improve query performance for large datasets.
 - **Customization**: To use a different database name, modify the `create_database()` call, e.g., `create_database("custom_voters.db")`.
+- **Import Time**: On an M4 Mac mini 64GB, the import time is just a few minutes. Your importing time may vary. 
 
 ## Contributing
 Feel free to fork this repository, submit issues, or create pull requests with enhancements (e.g., additional file support, custom date formats).
