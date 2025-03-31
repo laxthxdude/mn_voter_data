@@ -4,7 +4,7 @@ Welcome to the Minnesota Election Integrity Solutions (MNEIS) Voter Report proje
 
 ## Overview
 
-The goal of this project is to provide a web-based application designed to provide Minnesota voters with access to their voter registration details and election participation history. The system uses a SQLite database populated with voter and election data, a Flask web server for the frontend, and Python scripts to process and query the data. Users can input their first name, last name, and zip code to retrieve a personalized report.
+The goal of this project is to provide a web-based application designed to provide Minnesota voters with access to their voter registration details and election participation history. The system uses a SQLite database populated with voter and election data, a Flask server for the middleware (if wanting to use a browser frontend), and Python scripts to process and query the data. Users can input their first name, last name, and zip code to retrieve a personalized report.
 
 The project emphasizes transparency, privacy, and compliance with Minnesota Statutes Chapter 13, ensuring that all data usage aligns with legal requirements and prioritizes user consent.
 
