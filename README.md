@@ -157,7 +157,9 @@ The script requires the `chardet` library for encoding detection. Install it usi
 - Using `voter_election_report_printf.py`, you can use your Terminal (Command Prompt) to directly query the resulting sqlite database (`voters.db`). 
 - Example: Run the report script with arguments: `python3 voter_election_report_printf.py --first-name "John" --last-name "Doe" --zip-code "55101"`
 - Output will display voter information and election history in a tabulated format.
-- +----------+------------+-------------+-----------+----------+------------------+------------+----------+-------+
+
+```
++----------+------------+-------------+-----------+----------+------------------+------------+----------+-------+
 | Voter ID | First Name | Middle Name | Last Name | Zip Code | Registration Date | Birth Year | City     | State |
 +----------+------------+-------------+-----------+----------+------------------+------------+----------+-------+
 | 123456   | John       | A           | Doe       | 55101    | 2020-01-15       | 1980       | St. Paul | MN    |
@@ -171,6 +173,8 @@ The script requires the `chardet` library for encoding detection. Install it usi
 | 123456   | 2022-11-08      | State General Election  | P            |
 | 123456   | 2020-11-03      | State General Election  | A            |
 +----------+-----------------+-------------------------+--------------+
+```
+
 
 ## Technical Details for `voter_election_report.py`
 - Core logic for querying the database and returning voter reports as a dictionary (used by the web app).
