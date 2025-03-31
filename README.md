@@ -195,7 +195,7 @@ The script requires the `chardet` library for encoding detection. Install it usi
 - With the `voters.db` and `app.py` and `index.html` in the same directory, execute `phthon3 app.py`. This starts the Flask server, on port 5000.
 - Open a browser and navigate to `http://127.0.0.1:5000`. You should see a nice HTML page you can use to look up voter information.
 
-!(web_browser.png)
+![Example web](web_browser.png)
 
 ## Technical Details for `readme.txt`
 - Documentation from the Minnesota Secretary of State about voter file formats and abbreviations.
