@@ -193,7 +193,9 @@ The script requires the `chardet` library for encoding detection. Install it usi
 - Ensure you have generated the required `voters.db`
 - Ensure you have installed the required dependencies for `flask` and `tabulate`
 - With the `voters.db` and `app.py` and `index.html` in the same directory, execute `phthon3 app.py`. This starts the Flask server, on port 5000.
-- Open a browser and navigate to `http://127.0.0.1:5000`. You should see a nice HTML page you can use to look up voter information. 
+- Open a browser and navigate to `http://127.0.0.1:5000`. You should see a nice HTML page you can use to look up voter information.
+
+./web_browser.png
 
 ## Technical Details for `readme.txt`
 - Documentation from the Minnesota Secretary of State about voter file formats and abbreviations.
