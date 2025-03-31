@@ -1,19 +1,38 @@
-# Minnesota Voter Database Importer
+# MNEIS Voter Report Project
 
-This Python script creates a SQLite database (`voters.db`) and imports voter registration and election history data from a set of CSV files (`Voter01.txt` to `Voter08.txt` and `Election01.txt` to `Election08.txt`). It processes the files, handles encoding detection, and logs errors, providing a summary of total and imported rows for both voter and election data. The CSV files are part of the data set as obtained from the Minnesota OSS when requesting a full voter history data set for $46. 
+Welcome to the Minnesota Election Integrity Solutions (MNEIS) Voter Report project! This tool allows Minnesota citizens to verify their voter registration information and election history using publicly available data from the Minnesota Secretary of State. The project aims to enhance election integrity by enabling individuals to ensure the accuracy of their voter records. This project contains various elements which might be useful for others working with the MN OSS public voter data. 
+
+## Overview
+
+The goal of this project is to provide a web-based application designed to provide Minnesota voters with access to their voter registration details and election participation history. The system uses a SQLite database populated with voter and election data, a Flask web server for the frontend, and Python scripts to process and query the data. Users can input their first name, last name, and zip code to retrieve a personalized report.
+
+The project emphasizes transparency, privacy, and compliance with Minnesota Statutes Chapter 13, ensuring that all data usage aligns with legal requirements and prioritizes user consent.
+
+The project aims to expand in the future to provide additional useful data analysis tooling to analyze and report on data quality issues and compliance topics as related to Minnesota Statue for voter data. For example, in the future the ability to quickly and easily search on duplicate data, voters that are missing data, voters who are active but should not be, etc. 
 
 ## Features
-- Creates two SQLite tables:
+
+- Importing to a modern database: Python3 script which can import the provided MN OSS voter history data into a sqlite database (making data querying fast and easy).
+- Voter Information Lookup: Search for voter records by first name, last name, and zip code.
+- Election History: View a detailed history of elections in which the voter participated, including dates, descriptions, and voting methods.
+- Data Validation: Client-side validation ensures accurate input (e.g., valid Minnesota zip codes between 55001 and 56763).
+- Responsive Design: Built with Bootstrap for a user-friendly experience across devices.
+- Command-Line Alternative: Scripts are available for generating reports directly from the terminal.
+
+This Python script `import_to_sqlite3.py` creates a SQLite database (`voters.db`) and imports voter registration and election history data from a set of CSV files (`Voter01.txt` to `Voter08.txt` and `Election01.txt` to `Election08.txt`). It processes the files, handles encoding detection, and logs errors, providing a summary of total and imported rows for both voter and election data. The CSV files are part of the data set as obtained from the Minnesota OSS when requesting a full voter history data set for $46 as a Minnesota resident. 
+
+## Technical Details for `import_to_sqlite3.py`
+- Using python, creates a local sqlite (open source, free) database, with two tables:
   - `voters`: Stores voter registration details (e.g., `VoterId`, `FirstName`, `LastName`, `City`, `State`, `DOBYear`, etc.).
   - `election_history`: Stores voting history (e.g., `VoterId`, `ElectionDate`, `ElectionDescription`, `VotingMethod`).
-- Imports data from 8 voter files (`Voter01.txt` to `Voter08.txt`) and 8 election files (`Election01.txt` to `Election08.txt`).
+- Imports data from 8 voter files (`Voter01.txt` to `Voter08.txt`) in `voters` and 8 election files (`Election01.txt` to `Election08.txt`) into `election_history`. 
 - Detects file encoding using `chardet` to handle various text formats.
 - Includes error handling for malformed rows and provides a detailed error log.
 - Adds indexes on `FirstName`, `LastName`, and `ZipCode` for efficient querying.
 - Normalizes dates to `YYYY-MM-DD` format.
 - Prints a summary of total rows vs. imported rows, with warnings for discrepancies.
 
-## Prerequisites
+## Prerequisites for use of `import_to_sqlite3.py`
 - A computer with internet access and at least 4GB of free space.
 - Python 3 installed (see installation steps below if you don’t have it).
 - Required Python libraries: `sqlite3` (built-in), `csv` (built-in), `chardet`, `os` (built-in), `sys` (built-in), `datetime` (built-in).
@@ -71,7 +90,7 @@ The script requires the `chardet` library for encoding detection. Install it usi
 ## Usage
 
 1. **Prepare Your Input Files**:
-   - Place the script in the same directory as your input files:
+   - Ensure the script `import_to_sqlite3.py` in the same directory as your input files (as extracted from the MN OSS provided archive:
      - Voter files: `Voter01.txt` to `Voter08.txt` (CSV format, 38 columns).
      - Election files: `Election01.txt` to `Election08.txt` (CSV format, 4 columns).
    - **Voter File Format** (38 columns, with headers):
@@ -133,6 +152,51 @@ The script requires the `chardet` library for encoding detection. Install it usi
 - **Performance**: Indexes on `FirstName`, `LastName`, and `ZipCode` improve query performance for large datasets.
 - **Customization**: To use a different database name, modify the `create_database()` call, e.g., `create_database("custom_voters.db")`.
 - **Import Time**: On an M4 Mac mini 64GB, the import time is just a few minutes. Your importing time may vary. 
+
+## Technical Details for ## Technical Details for `voter_election_report_printf.py`
+- Using `voter_election_report_printf.py`, you can use your Terminal (Command Prompt) to directly query the resulting sqlite database (`voters.db`). 
+- Example: Run the report script with arguments: `python3 voter_election_report_printf.py --first-name "John" --last-name "Doe" --zip-code "55101"`
+- Output will display voter information and election history in a tabulated format.
+- +----------+------------+-------------+-----------+----------+------------------+------------+----------+-------+
+| Voter ID | First Name | Middle Name | Last Name | Zip Code | Registration Date | Birth Year | City     | State |
++----------+------------+-------------+-----------+----------+------------------+------------+----------+-------+
+| 123456   | John       | A           | Doe       | 55101    | 2020-01-15       | 1980       | St. Paul | MN    |
++----------+------------+-------------+-----------+----------+------------------+------------+----------+-------+
++---------------------------------------------------------------+
+| --------------------- Voter Election History ----------------- |
++---------------------------------------------------------------+
++----------+-----------------+-------------------------+--------------+
+| Voter ID | Election Date   | Election Description    | Voting Method |
++----------+-----------------+-------------------------+--------------+
+| 123456   | 2022-11-08      | State General Election  | P            |
+| 123456   | 2020-11-03      | State General Election  | A            |
++----------+-----------------+-------------------------+--------------+
+
+## Technical Details for `voter_election_report.py`
+- Core logic for querying the database and returning voter reports as a dictionary (used by the web app).
+
+## Technical Details for `app.py`
+- Flask application to serve the web interface.
+
+### Requirements for use via web browser
+- Python 3.7+
+- SQLite3
+- Flask (`pip install flask`)
+- Tabulate (`pip install tabulate`) - for command-line reporting
+- Web Browser (e.g., Safari, Chrome, Firefox) for the web interface
+
+### Installation for use via web browser
+- Ensure you have generated the required `voters.db`
+- Ensure you have installed the required dependencies for `flask` and `tabulate`
+- With the `voters.db` and `app.py` and `index.html` in the same directory, execute `phthon3 app.py`. This starts the Flask server, on port 5000.
+- Open a browser and navigate to `http://127.0.0.1:5000`. You should see a nice HTML page you can use to look up voter information. 
+
+## Technical Details for `readme.txt`
+- Documentation from the Minnesota Secretary of State about voter file formats and abbreviations.
+
+## Technical Details for `index.html`
+- HTML template for the web interface, styled with Bootstrap. Handles form input and displays results.
+
 
 ## Contributing
 Feel free to fork this repository, submit issues, or create pull requests with enhancements (e.g., additional file support, custom date formats).
