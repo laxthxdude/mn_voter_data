@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNEIS Voter Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <style>
+        body {
+            background-color: #A12630; /* Lighter red background */
+            padding-top: 40px;
+            color: #333; /* Default text color for contrast */
+        }
+        .container {
+            max-width: 900px;
+        }
+        .card {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 10px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+        .table {
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table th {
+            background-color: #e9ecef;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: 500;
+        }
+        #disclaimer-text {
+            font-size: 0.9rem;
+        }
+        .additional-details {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .voting-legend {
+            font-size: 0.75rem; /* Reduced from 0.85rem to prevent wrapping */
+            color: #6c757d;
+            margin-top: 10px;
+            text-align: right; /* Right justification */
+        }
+        .invalid-feedback, .space-warning {
+            display: none;
+        }
+        .is-invalid ~ .invalid-feedback, .has-space ~ .space-warning {
+            display: block;
+        }
+        .space-warning {
+            color: #ffca2c; /* Yellow warning color */
+            font-size: 0.9rem;
+        }
+        h1 {
+            color: #ffffff; /* White text for the header */
+        }
+        .footnote {
+            font-size: 0.85rem; /* Same as original voting-legend */
+            color: #6c757d; /* Same as voting-legend */
+            text-align: right;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">MNEIS Voter Report</h1>
+
+        <!-- Search Form -->
+        <div class="card p-4 mb-5">
+            <form method="POST" id="searchForm" novalidate>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="first_name" class="form-label">First Name</label>
+                        <input type="text" class="form-control" id="first_name" name="first_name" pattern="[A-Za-z\s'-]+" required>
+                        <div class="invalid-feedback" id="firstNameFeedback">
+                            Please enter a valid first name (letters, spaces, hyphens, and apostrophes only).
+                        </div>
+                        <div class="space-warning" id="firstNameSpaceWarning">
+                            Trailing spaces detected and will be removed.
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="last_name" class="form-label">Last Name</label>
+                        <input type="text" class="form-control" id="last_name" name="last_name" pattern="[A-Za-z\s'-]+" required>
+                        <div class="invalid-feedback" id="lastNameFeedback">
+                            Please enter a valid last name (letters, spaces, hyphens, and apostrophes only).
+                        </div>
+                        <div class="space-warning" id="lastNameSpaceWarning">
+                            Trailing spaces detected and will be removed.
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="zip_code" class="form-label">Zip Code</label>
+                        <input type="text" class="form-control" id="zip_code" name="zip_code" pattern="\d{5}" maxlength="5" required>
+                        <div class="invalid-feedback" id="zipFeedback">
+                            Please enter a valid 5-digit Minnesota zip code (55001–56763).
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disclaimer Section -->
+                <div class="mt-4">
+                    <p>Please read and agree to the disclaimer before searching:</p>
+                    <div class="accordion" id="disclaimerAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="disclaimerHeading">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#disclaimerCollapse" aria-expanded="false" aria-controls="disclaimerCollapse">
+                                    View Disclaimer
+                                </button>
+                            </h2>
+                            <div id="disclaimerCollapse" class="accordion-collapse collapse" aria-labelledby="disclaimerHeading" data-bs-parent="#disclaimerAccordion">
+                                <div class="accordion-body" id="disclaimer-text">
+                                    <h5>RESPONSIBLE CITIZENS TAKE RESPONSIBILITY</h5>
+                                    <p>Welcome to the Minnesota Election Integrity Solutions (MNEIS) website’s Voter Information Verification Service. The purpose of this service is to enable you to verify your voter roll information to ensure its accuracy and up-to-date status.</p>
+                                    <p>As you are aware, accurate and reliable voter rolls are fundamental to trustworthy elections. Recently, numerous states’ voter rolls have been subject to legitimate criticism. We strive to enhance the trustworthiness of elections in Minnesota and believe that each voter can effectively contribute to reliable elections by verifying their personal information and that of their family. This process can rectify inaccuracies in addresses, voter status, duplicate records, deceased voters, and voter histories. If you have relocated and changed your registration, it may be beneficial to ascertain whether you are still registered at your previous address.</p>
+                                    <p>County election officials are accountable for maintaining accurate voter rolls, and any errors should be promptly reported to them. Should you require assistance in reviewing or reporting an error, we will be pleased to provide support. Kindly send an email to <a href="mailto:INFO@MNEIS.ORG">INFO@MNEIS.ORG</a>.</p>
+                                    <p>Please review the following points, which outline the terms and conditions under which we offer this information to you.</p>
+                                    <ul>
+                                        <li><strong>Accuracy of Information:</strong> The information provided under the Voter Information Verification Service is based on publicly available data obtained from the Minnesota Secretary of State.</li>
+                                        <li><strong>No Endorsement:</strong> The information presented on this website does not constitute endorsement by the state of Minnesota or any of its affiliated entities. The utilization of state-provided data does not imply any partnership, sponsorship, or affiliation with the state of Minnesota.</li>
+                                        <li><strong>No Liability Disclaimer:</strong> The Secretary of State and County Election Officials are solely responsible for maintaining accurate voter rolls. We bear no responsibility for any errors, omissions, or inaccuracies in the information presented on this website. Our sole purpose is to provide official Minnesota public voter roll information, enabling the identification and correction of any errors. We explicitly disclaim any liability for any loss or damage resulting from the utilization of this information, whether direct, indirect, incidental, or consequential.</li>
+                                        <li><strong>Use at Your Own Risk Disclaimer:</strong> The information provided on this website is offered “as is” and users assume sole responsibility for its use. We do not warranties, express or implied, regarding the completeness, accuracy, reliability, suitability, or availability of the information.</li>
+                                        <li><strong>Privacy Policy:</strong> We prioritize your privacy. The data provided has been determined by the Secretary of State to be public information accessible to all Minnesota citizens. We refrain from collecting, storing, or sharing personal information without explicit consent.</li>
+                                        <li><strong>Compliance with Laws:</strong> Users of this website are obligated to adhere to all applicable laws and regulations. Eligibility for access requires being a Minnesota citizen aged 18 or older. Furthermore, users must certify that their use of the information is not for commercial purposes. Refer to Minnesota Statutes Chapter 13 for the pertinent legal framework. The information provided on this website is exclusively intended for lawful purposes.</li>
+                                        <li><strong>Disclaimer Updates:</strong> We reserve the right to modify or revise this disclaimer at any time without prior notice. Users are advised to periodically review this disclaimer for any updates.</li>
+                                        <li><strong>Contact Information:</strong> Should you have any inquiries or concerns regarding this disclaimer, please contact us at <a href="mailto:INFO@MNEIS.ORG">INFO@MNEIS.ORG</a>.</li>
+                                        <li><strong>Acknowledgment:</strong> By checking the designated box, you acknowledge that you are over 18 years of age and have read and understood the disclaimers presented above.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="agreement" name="agreement" required>
+                        <label class="form-check-label" for="agreement">
+                            I have read and agree to the disclaimer.
+                        </label>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-primary px-5" id="searchButton" disabled>Search</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Error Message -->
+        {% if error %}
+            <div class="alert alert-danger text-center" role="alert">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <!-- Results -->
+        {% if results %}
+            {% for result in results %}
+                <!-- Voter Info -->
+                <div class="card mb-4 p-4">
+                    <h2 class="h4 mb-3">Voter Information</h2>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    {% for key in result.voter_info.keys() %}
+                                        <th>{{ key }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    {% for value in result.voter_info.values() %}
+                                        <td>{{ value }}</td>
+                                    {% endfor %}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Additional Details (Collapsible) -->
+                    <div class="mt-3 d-flex justify-content-between align-items-center">
+                        <button class="btn btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#additionalDetails{{ loop.index }}" aria-expanded="false" aria-controls="additionalDetails{{ loop.index }}">
+                            Show Additional Details
+                        </button>
+                        <p class="footnote mb-0">OSS data set date: March 9, 2025</p>
+                    </div>
+                    <div class="collapse additional-details" id="additionalDetails{{ loop.index }}">
+                        <table class="table table-sm mt-2">
+                            <tbody>
+                                {% for key, value in result.additional_details.items() %}
+                                    <tr>
+                                        <td><strong>{{ key }}</strong></td>
+                                        <td>{{ value }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Election History -->
+                <div class="card mb-4 p-4">
+                    <h2 class="h4 mb-3">Election History</h2>
+                    {% if result.election_history %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        {% for key in result.election_history[0].keys() %}
+                                            <th>{{ key }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for election in result.election_history %}
+                                        <tr>
+                                            {% for value in election.values() %}
+                                                <td>{{ value }}</td>
+                                            {% endfor %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="voting-legend">Voting Methods: <strong>A</strong> - Voted by Absentee Ballot, <strong>M</strong> - Voted by Mail (Mail Ballot precinct), <strong>N</strong> - Information unavailable, <strong>P</strong> - Voted in Person</p>
+                    {% else %}
+                        <p class="text-muted">No election history found.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <!-- Custom JS -->
+    <script>
+        // Enable/disable Search button based on agreement checkbox
+        document.getElementById('agreement').addEventListener('change', function() {
+            document.getElementById('searchButton').disabled = !this.checked;
+        });
+
+        // Function to check for trailing spaces
+        function hasTrailingSpace(value) {
+            return value !== value.trimEnd();
+        }
+
+        // Function to trim input value and update field
+        function trimInput(input) {
+            const trimmedValue = input.value.trim();
+            if (input.value !== trimmedValue) {
+                input.value = trimmedValue;
+            }
+            return trimmedValue;
+        }
+
+        // Form submission validation
+        document.getElementById('searchForm').addEventListener('submit', function(event) {
+            const firstNameInput = document.getElementById('first_name');
+            const lastNameInput = document.getElementById('last_name');
+            const zipInput = document.getElementById('zip_code');
+            let isValid = true;
+
+            // Trim inputs before validation
+            const firstNameValue = trimInput(firstNameInput);
+            const lastNameValue = trimInput(lastNameInput);
+
+            // First Name validation
+            const namePattern = /^[A-Za-z\s'-]+$/;
+            if (!namePattern.test(firstNameValue)) {
+                event.preventDefault();
+                firstNameInput.classList.add('is-invalid');
+                document.getElementById('firstNameFeedback').textContent = 'Please enter a valid first name (letters, spaces, hyphens, and apostrophes only).';
+                isValid = false;
+            } else {
+                firstNameInput.classList.remove('is-invalid');
+            }
+
+            // Last Name validation
+            if (!namePattern.test(lastNameValue)) {
+                event.preventDefault();
+                lastNameInput.classList.add('is-invalid');
+                document.getElementById('lastNameFeedback').textContent = 'Please enter a valid last name (letters, spaces, hyphens, and apostrophes only).';
+                isValid = false;
+            } else {
+                lastNameInput.classList.remove('is-invalid');
+            }
+
+            // Zip Code validation
+            const zipValue = zipInput.value;
+            const zipNum = parseInt(zipValue, 10);
+            if (!/^\d{5}$/.test(zipValue) || zipNum < 55001 || zipNum > 56763) {
+                event.preventDefault();
+                zipInput.classList.add('is-invalid');
+                document.getElementById('zipFeedback').textContent = 'Please enter a valid 5-digit Minnesota zip code (55001–56763).';
+                isValid = false;
+            } else {
+                zipInput.classList.remove('is-invalid');
+            }
+
+            // If all valid, allow submission
+            return isValid;
+        });
+
+        // Real-time validation feedback with space detection
+        const namePattern = /^[A-Za-z\s'-]+$/;
+
+        document.getElementById('first_name').addEventListener('input', function() {
+            const value = this.value;
+            if (hasTrailingSpace(value)) {
+                this.classList.add('has-space');
+            } else {
+                this.classList.remove('has-space');
+            }
+            if (value && namePattern.test(value.trim())) {
+                this.classList.remove('is-invalid');
+            }
+        });
+
+        document.getElementById('last_name').addEventListener('input', function() {
+            const value = this.value;
+            if (hasTrailingSpace(value)) {
+                this.classList.add('has-space');
+            } else {
+                this.classList.remove('has-space');
+            }
+            if (value && namePattern.test(value.trim())) {
+                this.classList.remove('is-invalid');
+            }
+        });
+
+        document.getElementById('zip_code').addEventListener('input', function() {
+            const zipValue = this.value;
+            const zipNum = parseInt(zipValue, 10);
+            if (zipValue.length === 5 && /^\d{5}$/.test(zipValue) && zipNum >= 55001 && zipNum <= 56763) {
+                this.classList.remove('is-invalid');
+            }
+        });
+    </script>
+</body>
+</html>
