@@ -1,4 +1,3 @@
-```markdown
 # Voter Database Change Analyzer
 
 **`compare_voters_history.py`** — A Python script to compare two Minnesota voter registration databases (`*.db`) and generate **per-county** and **master** reports on voter changes.
@@ -155,7 +154,6 @@ VoterId, ElectionDate, ElectionDescription, VotingMethod
 ## License
 
 MIT © 2025
-```
 
 ---
 
