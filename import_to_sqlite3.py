@@ -11,11 +11,13 @@ from datetime import datetime
 import locale
 locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
+
 def detect_encoding(file_path):
     with open(file_path, 'rb') as f:
         raw = f.read(100000)
     result = chardet.detect(raw)
     return result['encoding'] or 'utf-8'
+
 
 def parse_date(date_str):
     if not date_str or not date_str.strip():
@@ -27,11 +29,22 @@ def parse_date(date_str):
             continue
     return None
 
-def create_database(db_name="voters.db"):
+
+def create_database(db_name=None):
+    # === NEW: Auto-name DB from parent folder ===
+    if db_name is None:
+        parent_folder = os.path.basename(os.path.abspath(os.getcwd()))
+        if parent_folder and parent_folder not in (".", "/"):
+            db_name = f"{parent_folder}.db"
+        else:
+            db_name = "voters.db"  # fallback
+    
+    print(f"Using database: {db_name}\n")
+    
     conn = sqlite3.connect(db_name)
     cur = conn.cursor()
 
-    # Tables
+    # Tables (unchanged)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS voters (
             VoterId INTEGER PRIMARY KEY,
@@ -57,7 +70,7 @@ def create_database(db_name="voters.db"):
         )
     ''')
 
-    # Indexes (only once)
+    # Indexes
     for sql in [
         "CREATE INDEX IF NOT EXISTS idx_fn ON voters(FirstName);",
         "CREATE INDEX IF NOT EXISTS idx_ln ON voters(LastName);",
@@ -84,12 +97,12 @@ def create_database(db_name="voters.db"):
         enc = detect_encoding(path)
         print(f"→ {fname} (encoding: {enc})")
 
-        # Optional row count (safe)
+        # Optional row count
         try:
             with open(path, 'r', encoding=enc, errors='replace') as f:
-                rows = sum(1 for _ in csv.reader(f, quotechar='"', skipinitialspace=True))
-                row_count = next(rows)  # header
-                row_count = sum(rows)
+                reader = csv.reader(f, quotechar='"', skipinitialspace=True)
+                next(reader, None)  # header
+                row_count = sum(1 for _ in reader)
             print(f"   {row_count:,} rows to import")
         except:
             row_count = "?"
@@ -186,6 +199,7 @@ def create_database(db_name="voters.db"):
 
     print("="*60)
     print("IMPORT COMPLETED SUCCESSFULLY")
+    print(f"Database                  : {db_name}")
     print(f"Total voters imported     : {total_voters:,}")
     print(f"Total election records    : {total_elections:,}")
     if errors:
@@ -195,5 +209,6 @@ def create_database(db_name="voters.db"):
     else:
         print("No errors!")
 
+
 if __name__ == "__main__":
-    create_database()
+    create_database()   # You can also call create_database("custom_name.db") manually
