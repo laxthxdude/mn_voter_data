@@ -133,7 +133,7 @@ If you plan to use the web interface, install Flask and Tabulate as described be
      - Warnings for missing files or row discrepancies.
      - Error log for malformed rows (first 10 errors shown).
    - Example output:
-     ```
+```
 Files:    8 voter, 8 election
 
 → Voter01.txt (encoding: utf-8-sig)
@@ -143,19 +143,7 @@ Files:    8 voter, 8 election
    500,000 rows read
    518,294 voters (1 duplicate VoterIds ignored)
 
-→ Voter03.txt (encoding: utf-8-sig)
-   500,000 rows read
-   508,575 voters (1 duplicate VoterIds ignored)
-
-→ Voter04.txt (encoding: utf-8-sig)
-   460,355 voters (1 duplicate VoterIds ignored)
-
-→ Voter05.txt (encoding: utf-8-sig)
-   449,299 voters (1 duplicate VoterIds ignored)
-
-→ Voter06.txt (encoding: utf-8-sig)
-   500,000 rows read
-   522,193 voters (1 duplicate VoterIds ignored)
+...
 
 → Voter07.txt (encoding: cp1252)
    485,192 voters (1 duplicate VoterIds ignored)
@@ -180,88 +168,7 @@ Election history
    5,500,000 rows read
    5,509,828 election rows
 
-→ Election02.txt (encoding: utf-8-sig)
-   500,000 rows read
-   1,000,000 rows read
-   1,500,000 rows read
-   2,000,000 rows read
-   2,500,000 rows read
-   3,000,000 rows read
-   3,500,000 rows read
-   4,000,000 rows read
-   4,500,000 rows read
-   5,000,000 rows read
-   5,500,000 rows read
-   5,866,075 election rows
-
-→ Election03.txt (encoding: utf-8-sig)
-   500,000 rows read
-   1,000,000 rows read
-   1,500,000 rows read
-   2,000,000 rows read
-   2,500,000 rows read
-   3,000,000 rows read
-   3,500,000 rows read
-   4,000,000 rows read
-   4,500,000 rows read
-   5,000,000 rows read
-   5,500,000 rows read
-   5,983,920 election rows
-
-→ Election04.txt (encoding: utf-8-sig)
-   500,000 rows read
-   1,000,000 rows read
-   1,500,000 rows read
-   2,000,000 rows read
-   2,500,000 rows read
-   3,000,000 rows read
-   3,500,000 rows read
-   4,000,000 rows read
-   4,500,000 rows read
-   5,000,000 rows read
-   5,500,000 rows read
-   5,687,909 election rows
-
-→ Election05.txt (encoding: utf-8-sig)
-   500,000 rows read
-   1,000,000 rows read
-   1,500,000 rows read
-   2,000,000 rows read
-   2,500,000 rows read
-   3,000,000 rows read
-   3,500,000 rows read
-   4,000,000 rows read
-   4,500,000 rows read
-   5,000,000 rows read
-   5,295,340 election rows
-
-→ Election06.txt (encoding: utf-8-sig)
-   500,000 rows read
-   1,000,000 rows read
-   1,500,000 rows read
-   2,000,000 rows read
-   2,500,000 rows read
-   3,000,000 rows read
-   3,500,000 rows read
-   4,000,000 rows read
-   4,500,000 rows read
-   5,000,000 rows read
-   5,500,000 rows read
-   5,646,814 election rows
-
-→ Election07.txt (encoding: utf-8-sig)
-   500,000 rows read
-   1,000,000 rows read
-   1,500,000 rows read
-   2,000,000 rows read
-   2,500,000 rows read
-   3,000,000 rows read
-   3,500,000 rows read
-   4,000,000 rows read
-   4,500,000 rows read
-   5,000,000 rows read
-   5,500,000 rows read
-   5,950,858 election rows
+...
 
 → Election08.txt (encoding: utf-8-sig)
    500,000 rows read
@@ -285,7 +192,7 @@ IMPORT COMPLETED SUCCESSFULLY
 Database                  : WO261108.db
 Voters imported           : 3,931,627
 Election rows imported    : 46,790,870
-     ```
+```
 
 ## Notes
 - **File Requirements**: The script expects `VoterNN.txt` and `ElectionNN.txt` files with quoted CSV. Missing files are skipped with a warning.
