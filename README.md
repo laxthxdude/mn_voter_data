@@ -22,20 +22,22 @@ The project aims to expand in the future to provide additional useful data analy
 This Python script `import_to_sqlite3.py` creates a SQLite database (`voters.db`) and imports voter registration and election history data from a set of CSV files (`Voter01.txt` to `Voter08.txt` and `Election01.txt` to `Election08.txt`). It processes the files, handles encoding detection, and logs errors, providing a summary of total and imported rows for both voter and election data. The CSV files are part of the data set as obtained from the Minnesota OSS when requesting a full voter history data set for $46 as a Minnesota resident. 
 
 ## Technical Details for `import_to_sqlite3.py`
-- Using python, creates a local sqlite (open source, free) database, with two tables:
+- Using python, creates a local sqlite database, with two tables:
   - `voters`: Stores voter registration details (e.g., `VoterId`, `FirstName`, `LastName`, `City`, `State`, `DOBYear`, etc.).
   - `election_history`: Stores voting history (e.g., `VoterId`, `ElectionDate`, `ElectionDescription`, `VotingMethod`).
-- Imports data from 8 voter files (`Voter01.txt` to `Voter08.txt`) in `voters` and 8 election files (`Election01.txt` to `Election08.txt`) into `election_history`. 
-- Detects file encoding using `chardet` to handle various text formats.
-- Includes error handling for malformed rows and provides a detailed error log.
-- Adds indexes on `FirstName`, `LastName`, and `ZipCode` for efficient querying.
-- Normalizes dates to `YYYY-MM-DD` format.
-- Prints a summary of total rows vs. imported rows, with warnings for discrepancies.
+- Accepts an original `WO*.zip` from the Secretary of State or a directory of quoted `VoterNN.txt` / `ElectionNN.txt` files. The zip is read in place; no extraction is required.
+- Detects encoding per file incrementally: UTF-8-sig is used when valid, otherwise falls back to Windows-1252 for districts with ½ and similar characters. No external `chardet` dependency.
+- Handles quoted CSV correctly – quotes are syntax, not data. Do **not** strip quotes from files before import.
+- Uses batch `executemany` inserts with BATCH_SIZE=50,000 and builds indexes after load for speed.
+- Includes error handling for malformed rows and provides a detailed error log with up to 100 samples.
+- Adds indexes on `FirstName`, `LastName`, `ZipCode`, and `VoterId` for efficient querying.
+- Normalizes dates to `YYYY-MM-DD` format with an LRU-cached fast path.
+- Prints a summary of total rows vs. imported rows, with warnings for discrepancies, and reports progress every 500,000 rows.
 
 ## Prerequisites for use of `import_to_sqlite3.py`
 - A computer with internet access and at least 4GB of free space.
 - Python 3 installed (see installation steps below if you don’t have it).
-- Required Python libraries: `sqlite3` (built-in), `csv` (built-in), `chardet`, `os` (built-in), `sys` (built-in), `datetime` (built-in).
+- Required Python libraries: `sqlite3` (built-in), `csv` (built-in), `os` (built-in), `sys` (built-in), `datetime` (built-in). No external encoding library is required.
 
 ## Installation
 
@@ -76,23 +78,17 @@ If you don’t have Python installed, follow these steps based on your operating
    - Verify: `python3 --version`
 
 ### Step 2: Install Dependencies
-The script requires the `chardet` library for encoding detection. Install it using `pip`:
+No external dependencies are required for `import_to_sqlite3.py`. The script uses only Python standard library modules. Standard library modules `sqlite3`, `csv`, `os`, `sys`, `datetime`, `argparse`, `zipfile`, `io`, `codecs`, `sqlite3` are built-in.
 
-1. **Open a Terminal/Command Prompt**:
-   - macOS: Terminal
-   - Windows: Command Prompt
-   - Linux: Terminal
-2. **Install `chardet`**:
-   - Run: `python3 -m pip install chardet`
-   - On Windows, you might use `python -m pip install chardet` if `python3` isn’t recognized.
-   - Other required modules (`sqlite3`, `csv`, `os`, `sys`, `datetime`) are part of Python’s standard library and don’t need separate installation.
+If you plan to use the web interface, install Flask and Tabulate as described below.
 
 ## Usage
 
 1. **Prepare Your Input Files**:
-   - Ensure the script `import_to_sqlite3.py` in the same directory as your input files (as extracted from the MN OSS provided archive:
-     - Voter files: `Voter01.txt` to `Voter08.txt` (CSV format, 38 columns).
-     - Election files: `Election01.txt` to `Election08.txt` (CSV format, 4 columns).
+   - The script accepts an original `WO*.zip` from the Secretary of State or a directory containing quoted `VoterNN.txt` and `ElectionNN.txt` files.
+   - If using a zip, keep the original quoted files inside the zip. Do **not** strip quotes from the files before import.
+   - Voter files: `VoterNN.txt` (CSV format, 38 columns).
+   - Election files: `ElectionNN.txt` (CSV format, 4 columns).
    - **Voter File Format** (38 columns, with headers):
      ```
      VoterId,CountyCode,FirstName,MiddleName,LastName,NameSuffix,HouseNumber,StreetName,UnitType,UnitNumber,Address2,City,State,ZipCode,MailAddress,MailCity,MailState,MailZipCode,PhoneNumber,RegistrationDate,DOBYear,StateMcdCode,McdName,PrecinctCode,PrecinctName,WardCode,School,SchSub,Judicial,Legislative,StateSen,Congressional,Commissioner,Park,SoilWater,Hospital,LegacyId,PermanentAbsentee
@@ -113,10 +109,21 @@ The script requires the `chardet` library for encoding detection. Install it usi
      ```
 
 2. **Run the Script**:
-   - Save the script as `voter_db_importer.py`.
    - Open a terminal in the directory containing the script and input files.
-   - Run: `python3 voter_db_importer.py`
-   - The script uses a default database name (`voters.db`), which you can modify by editing the `create_database()` call if desired.
+   - Run with a zip:
+     ```bash
+     python3 import_to_sqlite3.py /path/to/WO261108.zip
+     ```
+   - Or specify output:
+     ```bash
+     python3 import_to_sqlite3.py -o custom.db /path/to/WO261108.zip
+     ```
+   - Or use a directory of original quoted files:
+     ```bash
+     python3 import_to_sqlite3.py /path/to/unzipped_folder
+     ```
+   - If no source is provided, the script searches for a single `WO*.zip` in the current directory, script directory, or parent directory.
+   - The database is auto-named `<zipname>.db` or `voters.db` in the source directory. Use `-o` to override.
 
 3. **Output**:
    - Creates `voters.db` with two tables: `voters` and `election_history`.
@@ -127,30 +134,166 @@ The script requires the `chardet` library for encoding detection. Install it usi
      - Error log for malformed rows (first 10 errors shown).
    - Example output:
      ```
-     Processing voter files...
-     Processing Voter01.txt with 100 rows.
-     Imported 99 rows from Voter01.txt.
-     ...
-     Processing election history files...
-     Processing Election01.txt with 50 rows.
-     Imported 50 rows from Election01.txt.
-     ...
-     Total voter rows across all files (excluding headers): 800
-     Total imported voter rows into voters.db: 795
-     Warning: Imported voter rows (795) do not match total voter rows in files (800).
-     Total election rows across all files (excluding headers): 400
-     Total imported election rows into voters.db: 400
-     Encountered 5 errors across all files:
-       Row 2 in Voter01.txt: Incorrect number of fields (37 instead of 38). Skipping.
-       ...
+Files:    8 voter, 8 election
+
+→ Voter01.txt (encoding: utf-8-sig)
+   472,011 voters
+
+→ Voter02.txt (encoding: utf-8-sig)
+   500,000 rows read
+   518,294 voters (1 duplicate VoterIds ignored)
+
+→ Voter03.txt (encoding: utf-8-sig)
+   500,000 rows read
+   508,575 voters (1 duplicate VoterIds ignored)
+
+→ Voter04.txt (encoding: utf-8-sig)
+   460,355 voters (1 duplicate VoterIds ignored)
+
+→ Voter05.txt (encoding: utf-8-sig)
+   449,299 voters (1 duplicate VoterIds ignored)
+
+→ Voter06.txt (encoding: utf-8-sig)
+   500,000 rows read
+   522,193 voters (1 duplicate VoterIds ignored)
+
+→ Voter07.txt (encoding: cp1252)
+   485,192 voters (1 duplicate VoterIds ignored)
+
+→ Voter08.txt (encoding: utf-8-sig)
+   500,000 rows read
+   515,708 voters (1 duplicate VoterIds ignored)
+
+Election history
+
+→ Election01.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,500,000 rows read
+   5,509,828 election rows
+
+→ Election02.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,500,000 rows read
+   5,866,075 election rows
+
+→ Election03.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,500,000 rows read
+   5,983,920 election rows
+
+→ Election04.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,500,000 rows read
+   5,687,909 election rows
+
+→ Election05.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,295,340 election rows
+
+→ Election06.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,500,000 rows read
+   5,646,814 election rows
+
+→ Election07.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,500,000 rows read
+   5,950,858 election rows
+
+→ Election08.txt (encoding: utf-8-sig)
+   500,000 rows read
+   1,000,000 rows read
+   1,500,000 rows read
+   2,000,000 rows read
+   2,500,000 rows read
+   3,000,000 rows read
+   3,500,000 rows read
+   4,000,000 rows read
+   4,500,000 rows read
+   5,000,000 rows read
+   5,500,000 rows read
+   6,000,000 rows read
+   6,500,000 rows read
+   6,850,126 election rows
+
+Building search indexes...
+============================================================
+IMPORT COMPLETED SUCCESSFULLY
+Database                  : WO261108.db
+Voters imported           : 3,931,627
+Election rows imported    : 46,790,870
      ```
 
 ## Notes
-- **File Requirements**: The script expects exactly 8 voter and 8 election files named as specified. Missing files are skipped with a warning.
-- **Error Handling**: Rows with incorrect field counts or unparseable data (e.g., invalid dates, non-integer `VoterId`) are logged and skipped.
+- **File Requirements**: The script expects `VoterNN.txt` and `ElectionNN.txt` files with quoted CSV. Missing files are skipped with a warning.
+- **Encoding**: Each file is decoded incrementally as UTF-8-sig or Windows-1252. Do not pre-process files to remove quotes.
+- **Error Handling**: Rows with incorrect field counts or unparseable data (e.g., invalid dates, non-integer `VoterId`) are logged and skipped. Up to 100 error samples are kept.
 - **Date Parsing**: Supports formats like `MM/DD/YYYY`, `YYYY-MM-DD HH:MM:SS`, and normalizes to `YYYY-MM-DD`.
-- **Performance**: Indexes on `FirstName`, `LastName`, and `ZipCode` improve query performance for large datasets.
-- **Customization**: To use a different database name, modify the `create_database()` call, e.g., `create_database("custom_voters.db")`.
+- **Performance**: Indexes are built after load; PRAGMAs are tuned for bulk loading. BATCH_SIZE=50,000 rows per transaction.
+- **Customization**: Use `-o` to specify a custom database name. The build is atomic via a temporary `.building` file.
 - **Import Time**: On an M4 Mac mini 64GB, the import time is just a few minutes. Your importing time may vary. 
 
 ## Technical Details for ## Technical Details for `voter_election_report_printf.py`
