@@ -18,19 +18,28 @@ Windows-1252 otherwise.
 import argparse
 import codecs
 import csv
+import hashlib
 import io
 import os
 import sqlite3
 import sys
 import time
 import zipfile
+from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime
 from functools import lru_cache
+from pathlib import Path
 
 BATCH_SIZE = 50_000
 REPORT_EVERY = 500_000
 MAX_ERRORS_KEPT = 100
+VERIFY_BATCH = 400
+VERIFY_SAMPLES = 30
+# Election history is tens of millions of rows and has no unique key, so each
+# voter's rows are reduced to a count plus a 128-bit fingerprint. Adding the
+# digests (instead of XOR) keeps duplicate rows from cancelling each other.
+_FP_MASK = (1 << 128) - 1
 
 VOTER_COLUMNS = [
     "VoterId", "CountyCode", "FirstName", "MiddleName", "LastName", "NameSuffix",
@@ -175,7 +184,7 @@ def open_text(open_binary):
         text.close()
 
 
-def _csv_reader(stream, label):
+def _csv_reader(stream, label, warn_unquoted=True):
     """CSV reader for SOS quoted files.
 
     newline='' on the stream lets csv handle embedded newlines and CRLF.
@@ -186,7 +195,7 @@ def _csv_reader(stream, label):
         raise SystemExit(f"{label} is empty")
     if first.startswith("\ufeff"):
         first = first[1:]
-    if not first.startswith('"'):
+    if warn_unquoted and not first.startswith('"'):
         print(
             f"Warning: {label} is not quote-delimited. Commas inside a field "
             f"will be read as extra columns. Import the original WO*.zip, "
@@ -399,7 +408,313 @@ def import_file(conn, source, name, kind, errors):
     return inserted
 
 
-def build_database(source_path, db_path):
+def canonical_bytes(values):
+    """Unambiguous encoding of one stored row, for the election fingerprint."""
+    parts = []
+    for value in values:
+        if value is None:
+            parts.append(b"N\x1e")
+        elif isinstance(value, int):
+            parts.append(b"I" + str(value).encode("ascii") + b"\x1e")
+        else:
+            parts.append(b"T" + str(value).encode("utf-8") + b"\x1e")
+    return b"".join(parts)
+
+
+def row_fingerprint(values):
+    digest = hashlib.blake2b(canonical_bytes(values), digest_size=16).digest()
+    return int.from_bytes(digest, "little")
+
+
+def _iter_records(source, name, kind, warn_unquoted):
+    """Yield source rows using the same rules as the importer.
+
+    A yielded item is ("row", line_number, record) or ("skip", message).
+    """
+    label = source.label(name)
+    expected = VOTER_COLUMNS if kind == "voter" else ELECTION_COLUMNS
+    convert = voter_record if kind == "voter" else election_record
+    width = len(expected)
+    with open_text(source.open_binary(name)) as (stream, _encoding):
+        reader = _csv_reader(stream, label, warn_unquoted=warn_unquoted)
+        try:
+            header = next(reader)
+        except StopIteration:
+            raise SystemExit(f"{label} is empty")
+        _check_header(header, expected, label)
+        for line_num, row in enumerate(reader, start=2):
+            if not row or (len(row) == 1 and row[0] == ""):
+                continue
+            if len(row) != width:
+                yield ("skip", f"{label}:{line_num} wrong column count ({len(row)})")
+                continue
+            try:
+                record = convert(row)
+            except ValueError as exc:
+                yield ("skip", f"{label}:{line_num} {exc}")
+                continue
+            yield ("row", line_num, record)
+
+
+class VerifyReport:
+    def __init__(self):
+        self.voter_rows = 0
+        self.voter_duplicates = 0
+        self.election_rows = 0
+        self.mismatch_count = 0
+        self.election_voter_mismatches = 0
+        self.samples = []
+
+    def add(self, message):
+        self.mismatch_count += 1
+        self.note(message)
+
+    def note(self, message):
+        if len(self.samples) < VERIFY_SAMPLES:
+            self.samples.append(message)
+
+    @property
+    def ok(self):
+        return self.mismatch_count == 0 and self.election_voter_mismatches == 0
+
+
+def _fetch_voters(cur, voter_ids):
+    placeholders = ",".join(["?"] * len(voter_ids))
+    columns = ",".join(VOTER_COLUMNS)
+    cur.execute(
+        f"SELECT {columns} FROM voters WHERE VoterId IN ({placeholders})",
+        voter_ids,
+    )
+    return {row[0]: row for row in cur.fetchall()}
+
+
+def _voter_differences(expected, stored):
+    differences = []
+    for name, source_value, db_value in zip(VOTER_COLUMNS, expected, stored):
+        if source_value != db_value:
+            differences.append((name, source_value, db_value))
+    return differences
+
+
+def verify_voters(source, conn, report):
+    print("Verifying voters...", flush=True)
+    cur = conn.cursor()
+    seen = set()
+    checked = 0
+    next_report = REPORT_EVERY
+    batch = []
+
+    def flush():
+        nonlocal checked, next_report
+        if not batch:
+            return
+        found = _fetch_voters(cur, [record[0] for _file, _line, record in batch])
+        for file_label, line_num, record in batch:
+            voter_id = record[0]
+            where = f"{file_label}:{line_num} VoterId {voter_id}"
+            stored = found.get(voter_id)
+            if voter_id in seen:
+                report.voter_duplicates += 1
+                if stored is None:
+                    report.add(f"{where}: duplicate source row, and the database has no row")
+                elif tuple(stored) != tuple(record):
+                    fields = ", ".join(name for name, _a, _b in _voter_differences(record, stored))
+                    report.add(
+                        f"{where}: duplicate source row differs from the stored voter "
+                        f"({fields or 'values'})"
+                    )
+                continue
+            seen.add(voter_id)
+            if stored is None:
+                report.add(f"{where}: missing from the database")
+                continue
+            differences = _voter_differences(record, stored)
+            if differences:
+                shown = differences[:3]
+                detail = "; ".join(
+                    f"{name}: source {source_value!r}, database {db_value!r}"
+                    for name, source_value, db_value in shown
+                )
+                report.add(f"{where}: {detail}")
+        checked += len(batch)
+        batch.clear()
+        if checked >= next_report:
+            print(f"   {checked:,} voter rows checked", flush=True)
+            next_report += REPORT_EVERY
+
+    for name in source.voters:
+        label = source.label(name)
+        print(f"→ {label}", flush=True)
+        file_rows = 0
+        for item in _iter_records(source, name, "voter", warn_unquoted=False):
+            if item[0] == "skip":
+                report.add(item[1] + " was not imported")
+                continue
+            _kind, line_num, record = item
+            batch.append((label, line_num, record))
+            file_rows += 1
+            report.voter_rows += 1
+            if len(batch) >= VERIFY_BATCH:
+                flush()
+        flush()
+        print(f"   {file_rows:,} source rows", flush=True)
+
+    db_count = conn.execute("SELECT COUNT(*) FROM voters").fetchone()[0]
+    if db_count > len(seen):
+        extras = []
+        for (voter_id,) in conn.execute("SELECT VoterId FROM voters"):
+            if voter_id not in seen:
+                extras.append(voter_id)
+                if len(extras) == 10:
+                    break
+        shown = ", ".join(str(voter_id) for voter_id in extras)
+        report.add(
+            f"Voter table has {db_count - len(seen):,} rows that are not in the source. "
+            f"Extra VoterIds include {shown}."
+        )
+    duplicate_note = ""
+    if report.voter_duplicates:
+        duplicate_note = f", {report.voter_duplicates:,} duplicate source ids"
+    print(
+        f"   {report.voter_rows:,} voter rows checked"
+        f"{duplicate_note}\n",
+        flush=True,
+    )
+
+
+def verify_elections(source, conn, report):
+    print("Verifying election history...", flush=True)
+    fingerprints = {}
+    checked = 0
+    next_report = REPORT_EVERY
+
+    def add(voter_id, values, sign):
+        count, total = fingerprints.get(voter_id, (0, 0))
+        digest = row_fingerprint(values)
+        fingerprints[voter_id] = (count + sign, (total + sign * digest) & _FP_MASK)
+
+    for name in source.elections:
+        label = source.label(name)
+        print(f"→ {label}", flush=True)
+        file_rows = 0
+        for item in _iter_records(source, name, "election", warn_unquoted=False):
+            if item[0] == "skip":
+                report.add(item[1] + " was not imported")
+                continue
+            _kind, _line_num, record = item
+            add(record[0], record, 1)
+            file_rows += 1
+            report.election_rows += 1
+            checked += 1
+            if checked >= next_report:
+                print(f"   {checked:,} election rows checked", flush=True)
+                next_report += REPORT_EVERY
+        print(f"   {file_rows:,} source rows", flush=True)
+
+    print("   reading the database...", flush=True)
+    db_rows = 0
+    for record in conn.execute(
+        "SELECT VoterId, ElectionDate, ElectionDescription, VotingMethod "
+        "FROM election_history"
+    ):
+        add(record[0], record, -1)
+        db_rows += 1
+        if db_rows % REPORT_EVERY == 0:
+            print(f"   {db_rows:,} database rows read", flush=True)
+
+    bad_ids = [voter_id for voter_id, (count, total) in fingerprints.items() if count or total]
+    if bad_ids:
+        report.election_voter_mismatches = len(bad_ids)
+        noun = "voter" if len(bad_ids) == 1 else "voters"
+        report.note(
+            f"{len(bad_ids):,} {noun} have election rows that do not match the source"
+        )
+        sample_ids = bad_ids[:10]
+        source_rows = {voter_id: [] for voter_id in sample_ids}
+        wanted = set(sample_ids)
+        for name in source.elections:
+            for item in _iter_records(source, name, "election", warn_unquoted=False):
+                if item[0] != "row":
+                    continue
+                record = item[2]
+                if record[0] in wanted:
+                    source_rows[record[0]].append(record)
+        for voter_id in sample_ids:
+            db_for_voter = conn.execute(
+                "SELECT VoterId, ElectionDate, ElectionDescription, VotingMethod "
+                "FROM election_history WHERE VoterId = ?",
+                (voter_id,),
+            ).fetchall()
+            source_count, _total = fingerprints[voter_id]
+            # source_count is source minus database, so database count is
+            # len(db_for_voter). Report the actual rows that do not match.
+            missing, extra = _multiset_diff(source_rows[voter_id], db_for_voter)
+            print_missing = ", ".join(repr(row[1:]) for row in missing[:2]) or "none"
+            print_extra = ", ".join(repr(row[1:]) for row in extra[:2]) or "none"
+            report.note(
+                f"VoterId {voter_id}: election rows differ "
+                f"(source {len(source_rows[voter_id])}, "
+                f"database {len(db_for_voter)}, "
+                f"count delta {source_count}). "
+                f"Missing from database: {print_missing}. "
+                f"Extra in database: {print_extra}."
+            )
+    print(
+        f"   {report.election_rows:,} source rows, "
+        f"{db_rows:,} database rows\n",
+        flush=True,
+    )
+
+
+def _multiset_diff(source_rows, db_rows):
+    source_counts = Counter(tuple(row) for row in source_rows)
+    db_counts = Counter(tuple(row) for row in db_rows)
+    missing = list((source_counts - db_counts).elements())
+    extra = list((db_counts - source_counts).elements())
+    return missing, extra
+
+
+def verify_database(source, db_path):
+    """Re-read the source and compare it to the finished database.
+
+    Voters are compared column by column. Election rows are compared as a
+    multiset per voter. Returns 0 when every imported value matches.
+    """
+    print("=" * 60)
+    print("VERIFYING IMPORTED DATA")
+    print(f"Database: {db_path}\n")
+    started = time.monotonic()
+    report = VerifyReport()
+    uri = Path(db_path).resolve().as_uri() + "?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    try:
+        verify_voters(source, conn, report)
+        verify_elections(source, conn, report)
+    finally:
+        conn.close()
+
+    elapsed = time.monotonic() - started
+    print("=" * 60)
+    if report.ok:
+        print("VERIFICATION PASSED")
+    else:
+        print("VERIFICATION FAILED")
+    print(f"Voters checked            : {report.voter_rows:,}")
+    print(f"Duplicate voter ids       : {report.voter_duplicates:,}")
+    print(f"Election rows checked     : {report.election_rows:,}")
+    print(
+        f"Mismatches                : "
+        f"{report.mismatch_count + report.election_voter_mismatches:,}"
+    )
+    print(f"Verification elapsed      : {elapsed:,.0f}s")
+    if report.samples:
+        print("First mismatches:")
+        for message in report.samples:
+            print(f"   • {message}")
+    return 0 if report.ok else 1
+
+
+def build_database(source_path, db_path, verbose=False):
     source_path = os.path.abspath(source_path)
     db_path = os.path.abspath(db_path)
     source = open_source(source_path)
@@ -422,6 +737,7 @@ def build_database(source_path, db_path):
         )
 
         conn = sqlite3.connect(tmp_path)
+        verification_failed = False
         try:
             tune(conn)
             create_schema(conn)
@@ -444,6 +760,9 @@ def build_database(source_path, db_path):
             conn.close()
             conn = None
             os.replace(tmp_path, db_path)
+            verification_failed = False
+            if verbose:
+                verification_failed = verify_database(source, db_path) != 0
         finally:
             if conn is not None:
                 conn.close()
@@ -456,19 +775,27 @@ def build_database(source_path, db_path):
 
     elapsed = time.monotonic() - started
     print("=" * 60)
-    if errors.count:
+    if errors.count and verbose and verification_failed:
+        print("IMPORT FINISHED WITH SKIPPED ROWS AND VERIFICATION FAILED")
+    elif errors.count:
         print("IMPORT FINISHED WITH SKIPPED ROWS")
+    elif verbose and verification_failed:
+        print("IMPORT FINISHED, VERIFICATION FAILED")
     else:
         print("IMPORT COMPLETED SUCCESSFULLY")
     print(f"Database                  : {db_path}")
     print(f"Voters imported           : {total_voters:,}")
     print(f"Election rows imported    : {total_elections:,}")
     print(f"Elapsed                   : {elapsed:,.0f}s")
+    if verbose:
+        print(f"Verification              : {'FAILED' if verification_failed else 'passed'}")
     if errors.count:
         shown = len(errors.samples)
         print(f"Rows skipped              : {errors.count:,} (showing {shown})")
         for message in errors.samples:
             print(f"   • {message}")
+        return 1
+    if verification_failed:
         return 1
     print("No rows skipped.")
     return 0
@@ -539,6 +866,16 @@ def main(argv=None):
         help="SQLite file to create. Default: <zipname>.db beside the zip.",
     )
     parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help=(
+            "After the import, re-read the source files and verify the "
+            "database. Every voter column is compared. Election rows are "
+            "compared per voter, including repeated elections. Exit status "
+            "is 1 if anything does not match."
+        ),
+    )
+    parser.add_argument(
         "-cleanup",
         action="store_true",
         help=(
@@ -552,7 +889,7 @@ def main(argv=None):
 
     source = os.path.abspath(args.source) if args.source else find_default_source()
     db_path = os.path.abspath(args.output) if args.output else default_db_path(source)
-    return build_database(source, db_path)
+    return build_database(source, db_path, verbose=args.verbose)
 
 
 if __name__ == "__main__":
